@@ -1,0 +1,108 @@
+---
+title: "Transformed Testing Data"
+author: "Alan Phan"
+date: "12/1/2019"
+output: html_document
+---
+
+---
+title: "146 Homework Week 7"
+author: "Alan Phan"
+date: "11/13/2019"
+output:
+  html_document: default
+  word_document: default
+---
+```{r echo = T, results = "hide", warning = F}
+#load libraries
+library(ggplot2)
+library(tidyverse)
+library(TSA)
+library(tseries)
+library(dplyr)
+```
+
+```{r}
+#Load the data
+apple <- read.csv("C:/Users/erwu1/Desktop/AAPL_data.csv")
+```
+
+```{r}
+#Begin cleaning the data to get it ready for a time series analysis
+head(apple) #read the data
+apple.high <- apple$high #From here we isolate the high variable in order to conduct the time series analysis
+apple.high.test <- apple.high[1:1239]
+```
+
+```{r}
+#Create the time series
+apple.test <- ts(apple.high.test)
+apple.ts <- ts(apple.high)
+#plot the time series
+plot(apple.test)
+plot(apple.ts)
+```
+
+Looking at the time series we can see that the variance is not constant and there is definitely a trend going on. So before we try to fit a model we should first transform the data and attempt to difference it as well
+
+```{r, eval = F}
+#BoxCox.ar(y = apple.ts)
+```
+Using just a normal boxcox with the time series data produces an error however when using the square root of the time series data we get an output
+```{r}
+BoxCox.ar(sqrt(apple.ts))
+```
+From the boxcox output we can see that the 1/2 power is viable for the square root of the time series. This means that we should do a 1/4 power on the time series to produce an approximately normal data
+
+```{r}
+#Transform the data using the boxcox recommendation
+transformed.test <- apple.test^(1/4)
+transformed.ts <- apple.ts^(1/4)
+#Plot the transformed time series data
+plot(transformed.ts)
+```
+
+FORECASTING
+
+
+
+MA(1)
+```{r}
+apple.ma.test=arima(transformed.test, order=c(0,1,1),method="ML")
+apple.ma.test
+```
+The ML esitmates are θ = −0.9837, μˆ = 3.2139, sigma^2e = 0.01377, which gives the fitted model
+Yt = 3.2139 + et + 0.9837et−1
+
+Here are the MA(1) forecasts for lead times l = 1, 2, · · · 10, computed using the predict function in R:
+```{r}
+apple.ma.predict<-predict(apple.ma.test,n.ahead=20)
+round(apple.ma.predict$pred,3)
+```
+
+```{r}
+round(apple.ma.predict$se,3)
+```
+
+```{r}
+# Create lower and upper prediction interval bounds
+lower.pi<-apple.ma.predict$pred-qnorm(0.975,0,1)*apple.ma.predict$se
+upper.pi<-apple.ma.predict$pred+qnorm(0.975,0,1)*apple.ma.predict$se 
+# Display prediction intervals (2007-2026) 
+data.frame(Year=c(1240:1259),lower.pi,upper.pi)
+```
+
+```{r}
+# Original series starts at Year = 2013
+# Note: Argument n1=1880 starts plot at 2013
+# Note: Argument pch=16 produces a small black circle (for MMSE forecasts)
+#apple.ma.test
+plot(transformed.ts, pch = 16)
+plot(apple.ma.test, n.ahead = 20,ylab="Apple Stock",xlab="Year", col='red', pch=16)
+# Put horizontal line at ML estimate of overall mean
+#abline(h=coef(apple.ma.test)[names(coef(apple.ma.test))=='intercept']) 
+#no abline because intercept = 0
+# Put prediction interval lines on plot (darker than default)
+lines(y=lower.pi,x=1240:1259,lwd=2,col="red",lty="dashed")
+lines(y=upper.pi,x=1240:1259,lwd=2,col="red",lty="dashed")
+```
